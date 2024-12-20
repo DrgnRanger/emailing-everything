@@ -8,7 +8,7 @@ from os.path import isfile
 
 #Dictionary for templates
 email_dict = {
-    "Test Case" : ["A Test", "Yay\n", "<Jarrod.Rudis@libertymutual.com>","<digitalmail_016C@libertymutual.com>"],
+    "Test Case" : ["A Test", "Yay\n", "<Jarrod.Rudis@libertymutual.com>","<digitalmail_016C@libertymutual.com>"]
 }
 
 signature = ""
