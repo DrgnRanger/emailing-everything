@@ -6,6 +6,39 @@ import os
 from os.path import isfile
 import json
 
+class choice_window(tk.Toplevel):
+    def __init__(self, affirmative, closing, text):
+        tk.Toplevel.__init__(self)
+        self.title("")
+        self.resizable(0, 0)
+
+        for i in range(0, 1):
+            self.grid_columnconfigure(0, weight = 1)
+    
+        for i in range(0, 1):
+            self.grid_rowconfigure(0, weight = 1)
+
+        #Loading description label
+        self.load_choice = tk.Label(self)
+        self.load_choice["text"] = text
+        self.load_choice.grid(row = 0, column = 0, columnspan = 2, padx = 5, pady = 5)
+
+        #Yes button
+        self.yes_load = tk.Button(self)
+        self.yes_load["text"] = "Yes"
+        self.yes_load["relief"] = tk.RAISED
+        self.yes_load["command"] = affirmative
+        self.yes_load.grid(row = 1, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+
+        #Yes button
+        self.no_load = tk.Button(self)
+        self.no_load["text"] = "No"
+        self.no_load["relief"] = tk.RAISED
+        self.no_load["command"] = closing
+        self.no_load.grid(row = 1, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+        self.no_load.grid(row = 1, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+
+
 #Chooses directory, note that you cannot see files inside this directory
 def directory_picker_method():
     default_directory.set(filedialog.askdirectory())
@@ -31,14 +64,17 @@ def send_email(fr, to, template, attachments, sig, manual):
     #Popup for determining if emails have been sent
     progress_window = tk.Toplevel(main_window)
     progress_window.title("Sending Emails")
-    progress_window.geometry("300x100")
+    progress_window.geometry("100x50")
     progress_window.resizable(0, 0)
     
     email_progress = ttk.Label(
         progress_window,
         text = "Sending ..."
     )
-    email_progress.place(x = 25, y = 50, width = 250)
+    email_progress.grid(row = 0, column = 0, padx = 5, pady = 5)
+
+    progress_window.grid_columnconfigure(0, weight = 1)
+    progress_window.grid_rowconfigure(0, weight = 1)
 
     #This is for sending emails with attachments in a folder, as long as they are pdfs
     for filename in os.listdir(attachments.get()):
@@ -49,7 +85,12 @@ def send_email(fr, to, template, attachments, sig, manual):
         if full_path.endswith(".pdf"):
             new_mail = outlook.CreateItem(0)
 
-            new_mail.Subject = template["Subject"]
+            #Determining if the subject line should be today's date or not
+            if template["Subject"] == "Today" or template["Subject"] == "today":
+                new_mail.Subject = datetime.today().strftime("%m/%d/%y")
+
+            else:    
+                new_mail.Subject = template["Subject"]
 
             new_mail.Body = template["Body"] + sig
 
@@ -91,25 +132,52 @@ def send_to_json(path, edited_in):
 
 #Delete the specified entry in a dictionary
 def delete_entry(dict, del_path, key):
-    if key in dict:
-        del dict[key]
-    
-    else:
-        print("No key found")
+    #Methods for using choice window
+    def key_delete():
+        if key in dict:
+            del dict[key]
+        
+        else:
+            print("No key found")
 
-    print(dict)
-    send_to_json(del_path, dict)
-    
-    #Updating comboboxes
-    update_combobox()
+        #Cleanup files and finalize deletion
+        print(dict)
+        send_to_json(del_path, dict)
+        deletion_window.destroy()
 
+            #Updating comboboxes
+        update_combobox()
+    
+    def no_delete():
+        deletion_window.destroy()
+
+    deletion_text = "Are you sure you want to delete this entry?\n(it will be unrecoverable)"
+
+    deletion_window = choice_window(key_delete, no_delete, deletion_text)
 
 #Add an entry to the email dictionary
 def add_email_entry(email_template_name, sub, bod, to, frm, email_in_dict):
+    no_add_to = ""
+
+    #Checking if to and from have <> so as not to stack
+    for char in to:
+        if char == "<" or char == ">":
+            add_to = to
+        
+        else:
+            add_to = "<" + to + ">"
+    
+    for char in frm:
+        if char == "<" or char == ">":
+            add_frm = frm
+        
+        else:
+            add_frm = "<" + frm + ">"
+    
     email_in_dict[email_template_name] = {"Subject" : sub,
                             "Body" : bod,
-                            "To" : "<" + to + ">",
-                            "From" : "<" + frm + ">"
+                            "To" : add_to,
+                            "From" : add_frm
                             }
     
     variable_email_dictionary = email_in_dict
@@ -122,13 +190,58 @@ def add_email_entry(email_template_name, sub, bod, to, frm, email_in_dict):
 def add_signature_entry(sig_template_name, sig, sig_in_dict):
     sig_in_dict[sig_template_name] = sig
                             
-
     variable_signature_dictionary = sig_in_dict
-    print(variable_signature_dictionary)
     send_to_json(json_signature_path, variable_signature_dictionary)
 
     #Updating comboboxes
     update_combobox()
+
+def load_selected_sig_entry(selected_sig_key):
+    #Method definition of what buttons will do
+    def true_button():
+        sig_entry_name_in.delete(0, "end")
+        sig_full.delete("1.0", "end")
+
+        sig_entry_name_in.insert(0, selected_sig_key)
+        sig_full.insert("end", variable_signature_dictionary[selected_sig_key])
+
+        loading_signature.destroy()
+    
+    def false_button():
+        loading_signature.destroy()
+
+    #Text for button
+    loading_text = "Do you want to load this entry?\n(this will delete what is written)"
+
+    #Class for popup
+    loading_signature = choice_window(true_button, false_button, loading_text)
+
+def load_selected_email_entry(selected_email_key):
+    #Method definition of what buttons will do
+    def true_button(): 
+        subject_line.delete(0, "end")
+        to_line.delete(0, "end")
+        fr_line.delete(0, "end")
+        body_lines.delete("1.0", "end")
+        template_name.delete(0, "end")
+    
+        subject_line.insert(0, variable_email_dictionary[selected_email_key]["Subject"])
+        to_line.insert(0, variable_email_dictionary[selected_email_key]["To"])
+        fr_line.insert(0, variable_email_dictionary[selected_email_key]["From"])
+        body_lines.insert("1.0", variable_email_dictionary[selected_email_key]["Body"])
+        template_name.insert(0, selected_email_key)
+    
+        loading_email.destroy()
+
+    def false_button():
+        loading_email.destroy()
+
+    #Text for button
+    loading_text = "Do you want to load this entry?\n(this will delete what is written)"
+    
+    #Class for popup
+    loading_email = choice_window(true_button, false_button, loading_text)
+
 
 #Global variables
 json_email_path = "editable_email_dict.json"
@@ -156,16 +269,16 @@ tab_2 = ttk.Frame(tab_control)
 
 tab_control.add(tab_1, text = "Send Emails")
 tab_control.add(tab_2, text = "Edit Templates")
-tab_control.pack(expand = 1, fill ="both") 
+tab_control.pack(expand = 1, fill = "both")
 
 #TAB 1
 
 #Label for manual emailing option
 manual_pick_label = tk.Label(
     tab_1,
-    text = "Manually Emailing:"
+    text = "Manually Input Emails:"
 )
-manual_pick_label.grid(row = 0, column = 0, padx = 5, pady = 5)
+manual_pick_label.grid(row = 0, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Dropdown for manual picking
 manual_picker = ttk.Combobox(
@@ -174,47 +287,47 @@ manual_picker = ttk.Combobox(
     values = [True, False]
 )
 manual_picker.current(1)
-manual_picker.grid(row = 0, column = 1, padx = 5, pady = 5)
+manual_picker.grid(row = 0, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Label for From: in email
 from_label = tk.Label(
     tab_1,
     text = "From:"
     )
-from_label.grid(row = 1, column = 0, padx = 5, pady = 5)
+from_label.grid(row = 1, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Dropdown box making for picking manual from email
 from_email_picker = tk.Entry(
     tab_1
     )
-from_email_picker.grid(row = 1, column = 1, padx = 5, pady = 5)
+from_email_picker.grid(row = 1, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Label for To: in email
 to_label = tk.Label(
     tab_1,
     text = "To:"
     )
-to_label.grid(row = 2, column = 0, padx = 5, pady = 5)
+to_label.grid(row = 2, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Dropdown box for picking manual to email
 to_email_picker = tk.Entry(
     tab_1
     )
-to_email_picker.grid(row = 2, column = 1, padx = 5, pady = 5)
+to_email_picker.grid(row = 2, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Label for adding entry section
 send_template_section = tk.Label(
     tab_1,
     text = "Send Via Template",
 )
-send_template_section.grid(row = 3, column = 0, columnspan = 2, padx = 5, pady = 5)
+send_template_section.grid(row = 3, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Label for Choosing file directory
 directory_choice = tk.Label(
     tab_1,
     text = "Choose file directory:"
     )
-directory_choice.grid(row = 4, column = 0, padx = 5, pady = 5)
+directory_choice.grid(row = 4, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button for picking directory
 directory_picker = tk.Button(
@@ -223,7 +336,7 @@ directory_picker = tk.Button(
     relief = tk.RAISED,
     command = directory_picker_method
 )
-directory_picker.grid(row = 4, column = 1, padx = 5, pady = 5)
+directory_picker.grid(row = 4, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Keep track of directory chosen
 chosen_directory = tk.Entry(
@@ -232,14 +345,14 @@ chosen_directory = tk.Entry(
     state = "readonly",
     width = 40
     )
-chosen_directory.grid(row = 5, column = 0, columnspan = 2, padx = 5, pady = 5)
+chosen_directory.grid(row = 5, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Keep track of directory chosen
 pick_email = tk.Label(
     tab_1,
     text = "Pick a template:"
     )
-pick_email.grid(row = 6, column = 0, padx = 5, pady = 5)
+pick_email.grid(row = 6, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Dropdown box for email templates
 var_email_choice = tk.StringVar()
@@ -249,30 +362,37 @@ template_type_send = ttk.Combobox(
     textvariable = var_email_choice,
     state = "readonly"
     )
-template_type_send.grid(row = 6, column = 1, padx = 5, pady = 5)
+template_type_send.grid(row = 6, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button to send email with selected information
 emailer = tk.Button(
     tab_1,
     text = "Send Email",
     relief = tk.RAISED,
-    command = lambda: send_email(from_email_picker.get(), to_email_picker.get(), variable_email_dictionary[var_email_choice.get()], default_directory, var_signature_choice.get(), manual_picker.get())
+    command = lambda: send_email(
+        from_email_picker.get(), 
+        to_email_picker.get(), 
+        variable_email_dictionary[var_email_choice.get()], 
+        default_directory, 
+        variable_signature_dictionary[var_signature_choice.get()], 
+        manual_picker.get()
+        )
 )
-emailer.grid(row = 7, column = 0, columnspan = 2, padx = 5, pady = 5)
+emailer.grid(row = 7, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Label for detailing how the sending email button works
 send_template_section = tk.Label(
     tab_1,
-    text = "(If manual is true, email addresses in template will be overwritten)",
+    text = "(If manual is true, email addresses in template will be overwritten)"
 )
-send_template_section.grid(row = 8, column = 0, columnspan = 2, padx = 5, pady = 5)
+send_template_section.grid(row = 8, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Label for signature picking
 pick_signature = tk.Label(
     tab_1,
     text = "Pick a signature:"
     )
-pick_signature.grid(row = 9, column = 0, padx = 5, pady = 5)
+pick_signature.grid(row = 9, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Dropdown for signature picking
 var_signature_choice = tk.StringVar()
@@ -283,16 +403,20 @@ send_sig_choice = ttk.Combobox(
     state = "readonly"
     )
 send_sig_choice.current(0)
-send_sig_choice.grid(row = 9, column = 1, padx = 5, pady = 5)
+send_sig_choice.grid(row = 9, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button for deleting a dictionary entry
 del_signature_entry_button = tk.Button(
     tab_1,
     text = "Delete Chosen Sig. Entry",
     relief = tk.RAISED,
-    command = lambda: delete_entry(variable_signature_dictionary, json_signature_path, var_signature_choice.get())
+    command = lambda: delete_entry(
+        variable_signature_dictionary, 
+        json_signature_path, 
+        var_signature_choice.get()
+        )
 )
-del_signature_entry_button.grid(row = 10, column = 0, columnspan = 2, padx = 5, pady = 5)
+del_signature_entry_button.grid(row = 10, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Text field for adding the signature
 sig_full = tk.Text(
@@ -300,145 +424,192 @@ sig_full = tk.Text(
     height = 5,
     width = 40
 )
-sig_full.grid(row = 11, column = 0, columnspan = 2, padx = 5, pady = 5)
+sig_full.grid(row = 11, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Label for name when adding signature
 sig_entry_name = tk.Label(
     tab_1,
     text = "Sig. Name"
 )
-sig_entry_name.grid(row = 12, column = 0, padx = 5, pady = 5)
+sig_entry_name.grid(row = 12, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Name of signature entry 
 sig_entry_name_in = tk.Entry(
     tab_1,
     width = 15
 )
-sig_entry_name_in.grid(row = 12, column = 1, padx = 5, pady = 5)
+sig_entry_name_in.grid(row = 12, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button for adding to email dictionary
 add_signature_entry_button = tk.Button(
     tab_1,
-    text = "Add Entry",
+    text = "Add Signature Entry",
     relief = tk.RAISED,
-    command = lambda: add_signature_entry(sig_entry_name_in.get(), sig_full.get("1.0", "end"), variable_signature_dictionary)
+    command = lambda: add_signature_entry(
+        sig_entry_name_in.get(), 
+        sig_full.get("1.0", "end"), 
+        variable_signature_dictionary
+        )
 )
-add_signature_entry_button.grid(row = 13, column = 0, columnspan = 2, padx = 5, pady = 5)
+add_signature_entry_button.grid(row = 13, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+
+#Button for loading signature from choice
+load_signature_entry_button = tk.Button(
+    tab_1,
+    text = "Load Signature Entry",
+    relief = tk.RAISED,
+    command = lambda: load_selected_sig_entry(var_signature_choice.get())
+)
+load_signature_entry_button.grid(row = 13, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #TAB 2
 
 #Label for entry deletion
 del_entry_label = tk.Label(
     tab_2,
-    text = "Entry to Delete:"
+    text = "Entry to Delete/Load:"
     )
-del_entry_label.grid(row = 0, column = 0, padx = 5, pady = 5)
+del_entry_label.grid(row = 0, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Combobox for selecting an entry
-entry_var = tk.StringVar()
+del_entry_var = tk.StringVar()
 template_type_delete = ttk.Combobox(
     tab_2,
     values = list(variable_email_dictionary.keys()),
-    textvariable = entry_var,
+    textvariable = del_entry_var,
     state = "readonly"
     )
-template_type_delete.grid(row = 0, column = 1, padx = 5, pady = 5)
+template_type_delete.current(0)
+template_type_delete.grid(row = 0, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button for deleting a dictionary entry
 del_entry_button = tk.Button(
     tab_2,
     text = "Delete Entry",
     relief = tk.RAISED,
-    command = lambda: delete_entry(variable_email_dictionary, json_email_path, entry_var.get())
+    command = lambda: delete_entry(
+        variable_email_dictionary, 
+        json_email_path, 
+        del_entry_var.get()
+        )
 )
-del_entry_button.grid(row = 1, column = 0, columnspan = 2, padx = 5, pady = 5)
+del_entry_button.grid(row = 1, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Label for adding entry section
 add_entry_label = tk.Label(
     tab_2,
-    text = "Add an Entry",
+    text = "Add an Entry"
 )
-add_entry_label.grid(row = 2, column = 0, columnspan = 2, padx = 5, pady = 5)
+add_entry_label.grid(row = 2, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Label for adding entry section
 add_subject_label = tk.Label(
     tab_2,
-    text = "Subject:",
+    text = "Subject:"
 )
-add_subject_label.grid(row = 3, column = 0, padx = 5, pady = 5)
+add_subject_label.grid(row = 3, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Entry for subject line
 subject_line = tk.Entry(
     tab_2,
     width = 30
     )
-subject_line.grid(row = 3, column = 1, padx = 5, pady = 5)
+subject_line.grid(row = 3, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Label for adding to section
 to_label = tk.Label(
     tab_2,
-    text = "To:",
+    text = "To:"
 )
-to_label.grid(row = 4, column = 0, padx = 5, pady = 5)
+to_label.grid(row = 4, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Entry for to section
 to_line = tk.Entry(
     tab_2,
     width = 30
     )
-to_line.grid(row = 4, column = 1, padx = 5, pady = 5)
+to_line.grid(row = 4, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Label for adding from section
 fr_label = tk.Label(
     tab_2,
-    text = "From:",
+    text = "From:"
 )
-fr_label.grid(row = 5, column = 0, padx = 5, pady = 5)
+fr_label.grid(row = 5, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Entry for from section
 fr_line = tk.Entry(
     tab_2,
     width = 30
     )
-fr_line.grid(row = 5, column = 1, padx = 5, pady = 5)
+fr_line.grid(row = 5, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Label for body
 fr_label = tk.Label(
     tab_2,
     text = "Body:"
 )
-fr_label.grid(row = 6, column = 0, columnspan= 2, padx = 5, pady = 5)
+fr_label.grid(row = 6, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Text field for adding the body
 body_lines = tk.Text(
     tab_2,
     height = 10,
-    width = 35
+    width = 40
 )
-body_lines.grid(row = 7, column = 0, columnspan = 2, padx = 5, pady = 5)
+body_lines.grid(row = 7, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Label for name of email template
 template_label = tk.Label(
     tab_2,
     text = "Name of Template:"
 )
-template_label.grid(row = 8, column = 0, padx = 5, pady = 5)
+template_label.grid(row = 8, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Text field for adding the body
 template_name = tk.Entry(
     tab_2,
     width = 30
 )
-template_name.grid(row = 8, column = 1, padx = 5, pady = 5)
+template_name.grid(row = 8, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button for adding to email dictionary
 del_entry_button = tk.Button(
     tab_2,
-    text = "Add Entry",
+    text = "Add Email Template Entry",
     relief = tk.RAISED,
-    command = lambda: add_email_entry(template_name.get(), subject_line.get(), body_lines.get("1.0", "end"), to_line.get(), fr_line.get(), variable_email_dictionary)
+    command = lambda: add_email_entry(
+        template_name.get(), 
+        subject_line.get(), 
+        body_lines.get("1.0", "end"), 
+        to_line.get(), 
+        fr_line.get(), 
+        variable_email_dictionary
+        )
 )
-del_entry_button.grid(row = 9, column = 0, columnspan = 2, padx = 5, pady = 5)
+del_entry_button.grid(row = 9, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+
+#Button for loading email template from choice
+load_email_entry_button = tk.Button(
+    tab_2,
+    text = "Load Email Entry",
+    relief = tk.RAISED,
+    command = lambda: load_selected_email_entry(del_entry_var.get())
+)
+load_email_entry_button.grid(row = 9, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+
+#For keeping grid in line
+for i in range(0, 1):
+    tab_1.columnconfigure(i, weight = 1)
+
+for i in range(0, 13):  
+    tab_1.rowconfigure(i, weight = 1)
+
+for i in range(0, 1):
+    tab_2.columnconfigure(i, weight = 1)
+
+for i in range(0, 9):
+    tab_2.rowconfigure(i, weight = 1)
 
 #END TABS
 
