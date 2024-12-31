@@ -13,10 +13,10 @@ class choice_window(tk.Toplevel):
         self.resizable(0, 0)
 
         for i in range(0, 1):
-            self.grid_columnconfigure(0, weight = 1)
+            self.grid_columnconfigure(i, weight = 1)
     
         for i in range(0, 1):
-            self.grid_rowconfigure(0, weight = 1)
+            self.grid_rowconfigure(i, weight = 1)
 
         #Loading description label
         self.load_choice = tk.Label(self)
@@ -38,6 +38,56 @@ class choice_window(tk.Toplevel):
         self.no_load.grid(row = 1, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
         self.no_load.grid(row = 1, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
+#Create a tooltip for a given widget, this was sourced on stackoverflow
+class CreateToolTip(tk.Toplevel):
+    def __init__(self, widget, text='widget info'):
+        self.waittime = 500     #miliseconds
+        self.wraplength = 180   #pixels
+        self.widget = widget
+        self.text = text
+        self.widget.bind("<Enter>", self.enter)
+        self.widget.bind("<Leave>", self.leave)
+        self.widget.bind("<ButtonPress>", self.leave)
+        self.id = None
+        self.tw = None
+
+    def enter(self, event = None):
+        self.schedule()
+
+    def leave(self, event = None):
+        self.unschedule()
+        self.hidetip()
+
+    def schedule(self):
+        self.unschedule()
+        self.id = self.widget.after(self.waittime, self.showtip)
+
+    def unschedule(self):
+        id = self.id
+        self.id = None
+        if id:
+            self.widget.after_cancel(id)
+
+    def showtip(self, event=None):
+        x = y = 0
+        x, y, cx, cy = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 20
+        #Creates a toplevel window
+        self.tw = tk.Toplevel(self.widget)
+        #Leaves only the label and removes the app window
+        self.tw.wm_overrideredirect(True)
+        self.tw.wm_geometry("+%d+%d" % (x, y))
+        label = tk.Label(self.tw, text = self.text, justify = 'left',
+                       background ="#ffffff", relief = 'solid', borderwidth = 1,
+                       wraplength = self.wraplength)
+        label.pack(ipadx=1)
+
+    def hidetip(self):
+        tw = self.tw
+        self.tw= None
+        if tw:
+            tw.destroy()
 
 #Chooses directory, note that you cannot see files inside this directory
 def directory_picker_method():
@@ -96,9 +146,23 @@ def send_email(fr, to, template, attachments, sig, manual):
 
             #For deciding if the template is to be used or manual input
             if manual == True: 
+                split_to = to.split()
+                split_fr = fr.split()
+
+                split_to = to.split()
+                split_fr = fr.split()
+                email_to_list = ["<" + i + ">" for i in split_to]
+                email_fr_list = ["<" + i + ">" for i in split_fr]
+
+                combine_to = ""
+                combine_fr = ""
+
+                combine_to = "; ".join(email_to_list)
+                combine_fr = "; ".join(email_fr_list)
+
                 #new_mail.CC = cc (placeholder from earlier as reminder)
-                new_mail.To = "<" + to + ">"
-                new_mail.SentOnBehalfOfName = "<" + fr + ">"
+                new_mail.To = combine_to
+                new_mail.SentOnBehalfOfName = combine_fr
             
             else:
                 #new_mail.CC = cc (placeholder from earlier as reminder)
@@ -157,23 +221,26 @@ def delete_entry(dict, del_path, key):
 
 #Add an entry to the email dictionary
 def add_email_entry(email_template_name, sub, bod, to, frm, email_in_dict):
-    no_add_to = ""
-
     #Checking if to and from have <> so as not to stack
+    split_to = to.split()
+    split_frm = frm.split()
+
     for char in to:
         if char == "<" or char == ">":
             add_to = to
-        
+
         else:
-            add_to = "<" + to + ">"
-    
+            email_to_list = ["<" + i + ">" for i in split_to]
+            add_to = "; ".join(email_to_list)
+        
     for char in frm:
-        if char == "<" or char == ">":
+        if char == "<" or char == ">":    
             add_frm = frm
-        
-        else:
-            add_frm = "<" + frm + ">"
-    
+
+        else:   
+            email_frm_list = ["<" + i + ">" for i in split_frm]
+            add_frm = "; ".join(email_frm_list)
+
     email_in_dict[email_template_name] = {"Subject" : sub,
                             "Body" : bod,
                             "To" : add_to,
@@ -187,6 +254,7 @@ def add_email_entry(email_template_name, sub, bod, to, frm, email_in_dict):
     #Updating comboboxes
     update_combobox()
 
+#Method for adding signature
 def add_signature_entry(sig_template_name, sig, sig_in_dict):
     sig_in_dict[sig_template_name] = sig
                             
@@ -196,6 +264,7 @@ def add_signature_entry(sig_template_name, sig, sig_in_dict):
     #Updating comboboxes
     update_combobox()
 
+#Method for loading signature entry
 def load_selected_sig_entry(selected_sig_key):
     #Method definition of what buttons will do
     def true_button():
@@ -216,6 +285,7 @@ def load_selected_sig_entry(selected_sig_key):
     #Class for popup
     loading_signature = choice_window(true_button, false_button, loading_text)
 
+#Method for loading email template
 def load_selected_email_entry(selected_email_key):
     #Method definition of what buttons will do
     def true_button(): 
@@ -241,7 +311,6 @@ def load_selected_email_entry(selected_email_key):
     
     #Class for popup
     loading_email = choice_window(true_button, false_button, loading_text)
-
 
 #Global variables
 json_email_path = "editable_email_dict.json"
@@ -301,6 +370,7 @@ from_email_picker = tk.Entry(
     tab_1
     )
 from_email_picker.grid(row = 1, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+frm_pick_ttp = CreateToolTip(from_email_picker, "For multiple emails, separate with a space.")
 
 #Label for To: in email
 to_label = tk.Label(
@@ -314,6 +384,7 @@ to_email_picker = tk.Entry(
     tab_1
     )
 to_email_picker.grid(row = 2, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+to_pick_ttp = CreateToolTip(to_email_picker, "For multiple emails, separate with a space.")
 
 #Label for adding entry section
 send_template_section = tk.Label(
@@ -515,6 +586,7 @@ subject_line = tk.Entry(
     width = 30
     )
 subject_line.grid(row = 3, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+subject_ttp = CreateToolTip(subject_line, "To make the template enter the date the email is sent, enter 'today' or 'Today' as the subject line.")
 
 #Label for adding to section
 to_label = tk.Label(
@@ -529,6 +601,7 @@ to_line = tk.Entry(
     width = 30
     )
 to_line.grid(row = 4, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+to_ttp = CreateToolTip(to_line, "For multiple emails, separate with a space.")
 
 #Label for adding from section
 fr_label = tk.Label(
@@ -543,6 +616,7 @@ fr_line = tk.Entry(
     width = 30
     )
 fr_line.grid(row = 5, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+fr_ttp = CreateToolTip(fr_line, "For multiple emails, separate with a space.")
 
 #Label for body
 fr_label = tk.Label(
