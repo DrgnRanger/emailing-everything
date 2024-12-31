@@ -148,20 +148,22 @@ def send_email(fr, to, template, attachments, sig, manual):
             #For deciding if the template is to be used or manual input
             if manual == True: 
                 split_to = to.split()
+                #split_cc = cc.split()
                 split_fr = fr.split()
 
-                split_to = to.split()
-                split_fr = fr.split()
                 email_to_list = ["<" + i + ">" for i in split_to]
+                #email_cc_list = ["<" + i + ">" for i in split_cc]
                 email_fr_list = ["<" + i + ">" for i in split_fr]
 
                 combine_to = ""
+                #combine_cc = ""
                 combine_fr = ""
 
                 combine_to = "; ".join(email_to_list)
+                #combine_cc = "; ".join(email_cc_list)
                 combine_fr = "; ".join(email_fr_list)
 
-                #new_mail.CC = cc (placeholder from earlier as reminder)
+                #new_mail.CC = cc (this may be added, functionality above)
                 new_mail.To = combine_to
                 new_mail.SentOnBehalfOfName = combine_fr
             
@@ -229,6 +231,7 @@ def delete_entry(dict, del_path, key):
 def add_email_entry(email_template_name, sub, bod, to, cc, frm, email_in_dict):
     #Checking if to and from have <> so as not to stack
     split_to = to.split()
+    split_cc = cc.split
     split_frm = frm.split()
 
     for char in to:
@@ -238,7 +241,15 @@ def add_email_entry(email_template_name, sub, bod, to, cc, frm, email_in_dict):
         else:
             email_to_list = ["<" + i + ">" for i in split_to]
             add_to = "; ".join(email_to_list)
-        
+
+    for char in cc:
+        if char == "<" or char == ">":    
+            add_cc = cc
+
+        else:
+            email_cc_list = ["<" + i + ">" for i in split_cc]
+            add_cc = "; ".join(email_cc_list)
+
     for char in frm:
         if char == "<" or char == ">":    
             add_frm = frm
@@ -250,7 +261,7 @@ def add_email_entry(email_template_name, sub, bod, to, cc, frm, email_in_dict):
     email_in_dict[email_template_name] = {"Subject" : sub,
                             "Body" : bod,
                             "To" : add_to,
-                            "CC" : cc,
+                            "CC" : add_cc,
                             "From" : add_frm
                             }
     
