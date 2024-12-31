@@ -166,7 +166,12 @@ def send_email(fr, to, template, attachments, sig, manual):
                 new_mail.SentOnBehalfOfName = combine_fr
             
             else:
-                #new_mail.CC = cc (placeholder from earlier as reminder)
+                if template["CC"] != "":
+                    new_mail.CC = template["CC"]
+                
+                else:
+                    pass
+
                 new_mail.To = template["To"]
                 new_mail.SentOnBehalfOfName = template["From"]
 
@@ -221,7 +226,7 @@ def delete_entry(dict, del_path, key):
     deletion_window = choice_window(key_delete, no_delete, deletion_text)
 
 #Add an entry to the email dictionary
-def add_email_entry(email_template_name, sub, bod, to, frm, email_in_dict):
+def add_email_entry(email_template_name, sub, bod, to, cc, frm, email_in_dict):
     #Checking if to and from have <> so as not to stack
     split_to = to.split()
     split_frm = frm.split()
@@ -245,6 +250,7 @@ def add_email_entry(email_template_name, sub, bod, to, frm, email_in_dict):
     email_in_dict[email_template_name] = {"Subject" : sub,
                             "Body" : bod,
                             "To" : add_to,
+                            "CC" : cc,
                             "From" : add_frm
                             }
     
@@ -292,12 +298,14 @@ def load_selected_email_entry(selected_email_key):
     def true_button(): 
         subject_line.delete(0, "end")
         to_line.delete(0, "end")
+        cc_line.delete(0, "end")
         fr_line.delete(0, "end")
         body_lines.delete("1.0", "end")
         template_name.delete(0, "end")
     
         subject_line.insert(0, variable_email_dictionary[selected_email_key]["Subject"])
         to_line.insert(0, variable_email_dictionary[selected_email_key]["To"])
+        cc_line.insert(0, variable_email_dictionary[selected_email_key]["CC"])
         fr_line.insert(0, variable_email_dictionary[selected_email_key]["From"])
         body_lines.insert("1.0", variable_email_dictionary[selected_email_key]["Body"])
         template_name.insert(0, selected_email_key)
@@ -598,19 +606,35 @@ to_line = tk.Entry(
 to_line.grid(row = 4, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 to_ttp = CreateToolTip(to_line, "For multiple emails, separate with a space.")
 
+#Label for adding cc section
+cc_label = tk.Label(
+    tab_2,
+    text = "cc:"
+)
+cc_label.grid(row = 5, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+
+#Entry for to section
+cc_line = tk.Entry(
+    tab_2,
+    width = 30
+    )
+cc_line.grid(row = 5, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+cc_ttp = CreateToolTip(to_line, "For multiple emails, separate with a space.")
+
+
 #Label for adding from section
 fr_label = tk.Label(
     tab_2,
     text = "From:"
 )
-fr_label.grid(row = 5, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+fr_label.grid(row = 6, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Entry for from section
 fr_line = tk.Entry(
     tab_2,
     width = 30
     )
-fr_line.grid(row = 5, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+fr_line.grid(row = 6, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 fr_ttp = CreateToolTip(fr_line, "For multiple emails, separate with a space.")
 
 #Label for body
@@ -618,7 +642,7 @@ fr_label = tk.Label(
     tab_2,
     text = "Body:"
 )
-fr_label.grid(row = 6, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+fr_label.grid(row = 7, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Text field for adding the body
 body_lines = tk.Text(
@@ -626,21 +650,21 @@ body_lines = tk.Text(
     height = 10,
     width = 40
 )
-body_lines.grid(row = 7, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+body_lines.grid(row = 8, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Label for name of email template
 template_label = tk.Label(
     tab_2,
     text = "Name of Template:"
 )
-template_label.grid(row = 8, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+template_label.grid(row = 9, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Text field for adding the body
 template_name = tk.Entry(
     tab_2,
     width = 30
 )
-template_name.grid(row = 8, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+template_name.grid(row = 9, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 temp_name_ttp = CreateToolTip(template_name, "If you use the same name as a new template, or load a template, any changes you have made will overwrite the original.")
 
 #Button for adding to email dictionary
@@ -652,12 +676,13 @@ del_entry_button = tk.Button(
         template_name.get(), 
         subject_line.get(), 
         body_lines.get("1.0", "end"), 
-        to_line.get(), 
+        to_line.get(),
+        cc_line.get(), 
         fr_line.get(), 
         variable_email_dictionary
         )
 )
-del_entry_button.grid(row = 9, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+del_entry_button.grid(row = 10, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button for loading email template from choice
 load_email_entry_button = tk.Button(
@@ -666,7 +691,7 @@ load_email_entry_button = tk.Button(
     relief = tk.RAISED,
     command = lambda: load_selected_email_entry(del_entry_var.get())
 )
-load_email_entry_button.grid(row = 9, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+load_email_entry_button.grid(row = 10, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #For keeping grid in line
 for i in range(0, 1):
@@ -678,7 +703,7 @@ for i in range(0, 13):
 for i in range(0, 1):
     tab_2.columnconfigure(i, weight = 1)
 
-for i in range(0, 9):
+for i in range(0, 10):
     tab_2.rowconfigure(i, weight = 1)
 
 #END TABS
