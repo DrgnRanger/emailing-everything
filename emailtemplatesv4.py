@@ -6,6 +6,7 @@ import os
 from os.path import isfile
 import json
 
+#Create a choice window that pops up and allows choices on button press
 class choice_window(tk.Toplevel):
     def __init__(self, affirmative, closing, text):
         tk.Toplevel.__init__(self)
@@ -41,7 +42,7 @@ class choice_window(tk.Toplevel):
 #Create a tooltip for a given widget, this was sourced on stackoverflow
 class CreateToolTip(tk.Toplevel):
     def __init__(self, widget, text='widget info'):
-        self.waittime = 500     #miliseconds
+        self.waittime = 200     #miliseconds
         self.wraplength = 180   #pixels
         self.widget = widget
         self.text = text
@@ -450,20 +451,14 @@ emailer = tk.Button(
         )
 )
 emailer.grid(row = 7, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
-
-#Label for detailing how the sending email button works
-send_template_section = tk.Label(
-    tab_1,
-    text = "(If manual is true, email addresses in template will be overwritten)"
-)
-send_template_section.grid(row = 8, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+emailer_ttp = CreateToolTip(emailer, "If manual is true, email addresses in template will be overwritten.")
 
 #Label for signature picking
 pick_signature = tk.Label(
     tab_1,
     text = "Pick a signature:"
     )
-pick_signature.grid(row = 9, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+pick_signature.grid(row = 8, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Dropdown for signature picking
 var_signature_choice = tk.StringVar()
@@ -474,7 +469,7 @@ send_sig_choice = ttk.Combobox(
     state = "readonly"
     )
 send_sig_choice.current(0)
-send_sig_choice.grid(row = 9, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+send_sig_choice.grid(row = 8, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button for deleting a dictionary entry
 del_signature_entry_button = tk.Button(
@@ -487,7 +482,7 @@ del_signature_entry_button = tk.Button(
         var_signature_choice.get()
         )
 )
-del_signature_entry_button.grid(row = 10, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+del_signature_entry_button.grid(row = 9, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Text field for adding the signature
 sig_full = tk.Text(
@@ -495,21 +490,21 @@ sig_full = tk.Text(
     height = 5,
     width = 40
 )
-sig_full.grid(row = 11, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+sig_full.grid(row = 10, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Label for name when adding signature
 sig_entry_name = tk.Label(
     tab_1,
     text = "Sig. Name"
 )
-sig_entry_name.grid(row = 12, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+sig_entry_name.grid(row = 11, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Name of signature entry 
 sig_entry_name_in = tk.Entry(
     tab_1,
     width = 15
 )
-sig_entry_name_in.grid(row = 12, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+sig_entry_name_in.grid(row = 11, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button for adding to email dictionary
 add_signature_entry_button = tk.Button(
@@ -522,7 +517,7 @@ add_signature_entry_button = tk.Button(
         variable_signature_dictionary
         )
 )
-add_signature_entry_button.grid(row = 13, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+add_signature_entry_button.grid(row = 12, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button for loading signature from choice
 load_signature_entry_button = tk.Button(
@@ -531,7 +526,7 @@ load_signature_entry_button = tk.Button(
     relief = tk.RAISED,
     command = lambda: load_selected_sig_entry(var_signature_choice.get())
 )
-load_signature_entry_button.grid(row = 13, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+load_signature_entry_button.grid(row = 12, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #TAB 2
 
@@ -646,6 +641,7 @@ template_name = tk.Entry(
     width = 30
 )
 template_name.grid(row = 8, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+temp_name_ttp = CreateToolTip(template_name, "If you use the same name as a new template, or load a template, any changes you have made will overwrite the original.")
 
 #Button for adding to email dictionary
 del_entry_button = tk.Button(
