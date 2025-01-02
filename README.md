@@ -1,0 +1,1 @@
+This is a somewhat simple python program for sending bulk emails with pdf attachements, the signature of the email can be set, and templates can be made for whatever kind of bulk email is necessary. Templates can also be loaded from .msg files, I would prefer this to be done with win32com but it was necessary to have another script do this.
