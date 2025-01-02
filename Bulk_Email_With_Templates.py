@@ -399,13 +399,13 @@ def import_email_from_file():
     #Class for popup
     import_email = choice_window(true_button, false_button, import_text)
 
-#Global variables
+#Global variables, this does assume that both json files are in the same directory as this program
 json_email_path = "editable_email_dict.json"
 json_signature_path = "editable_signature.json"
 variable_email_dictionary = {}
 variable_signature_dictionary = {}
 
-#Initialize main window
+#Initialize main window, this could be done in a class for a more robust approach, but that will take a large rewrite and isn't entirely necessary
 main_window = tk.Tk()
 main_window.config(width = 315, height = 490)
 main_window.title("Mail Sending")
