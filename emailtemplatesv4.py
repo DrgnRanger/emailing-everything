@@ -5,6 +5,7 @@ import tkinter as tk
 import os
 from os.path import isfile
 import json
+import extract_msg as ext
 
 #Create a choice window that pops up and allows choices on button press
 class choice_window(tk.Toplevel):
@@ -168,7 +169,7 @@ def send_email(fr, to, template, attachments, sig, manual):
                 new_mail.SentOnBehalfOfName = combine_fr
             
             else:
-                if template["CC"] != "":
+                if template["CC"] != "" or template["CC"] != "None":
                     new_mail.CC = template["CC"]
                 
                 else:
@@ -229,34 +230,34 @@ def delete_entry(dict, del_path, key):
 
 #Add an entry to the email dictionary
 def add_email_entry(email_template_name, sub, bod, to, cc, frm, email_in_dict):
-    #Checking if to and from have <> so as not to stack
-    split_to = to.split()
-    split_cc = cc.split
-    split_frm = frm.split()
+    #Initialize variables
+    add_to = ""
+    add_cc = ""
+    add_frm = ""
 
-    for char in to:
-        if char == "<" or char == ">":
-            add_to = to
+    if "<" in to or ">" in to:
+        add_to = to
 
-        else:
-            email_to_list = ["<" + i + ">" for i in split_to]
-            add_to = "; ".join(email_to_list)
+    else:
+        split_to = to.split()
+        email_to_list = ["<" + i + ">" for i in split_to]
+        add_to = "; ".join(email_to_list)
 
-    for char in cc:
-        if char == "<" or char == ">":    
-            add_cc = cc
+    if "<" in cc or ">" in cc:
+        add_cc = cc
 
-        else:
-            email_cc_list = ["<" + i + ">" for i in split_cc]
-            add_cc = "; ".join(email_cc_list)
+    else:
+        split_cc = cc.split()
+        email_cc_list = ["<" + i + ">" for i in split_cc]
+        add_cc = "; ".join(email_cc_list)
 
-    for char in frm:
-        if char == "<" or char == ">":    
-            add_frm = frm
+    if "<" in frm or ">" in frm:
+        add_frm = frm
 
-        else:   
-            email_frm_list = ["<" + i + ">" for i in split_frm]
-            add_frm = "; ".join(email_frm_list)
+    else:
+        split_frm = frm.split()
+        email_frm_list = ["<" + i + ">" for i in split_frm]
+        add_frm = "; ".join(email_frm_list)
 
     email_in_dict[email_template_name] = {"Subject" : sub,
                             "Body" : bod,
@@ -306,14 +307,16 @@ def load_selected_sig_entry(selected_sig_key):
 #Method for loading email template
 def load_selected_email_entry(selected_email_key):
     #Method definition of what buttons will do
-    def true_button(): 
+    def true_button():
+        #Deleting anything in entry fields
         subject_line.delete(0, "end")
         to_line.delete(0, "end")
         cc_line.delete(0, "end")
         fr_line.delete(0, "end")
         body_lines.delete("1.0", "end")
         template_name.delete(0, "end")
-    
+
+        #Loading entry fields
         subject_line.insert(0, variable_email_dictionary[selected_email_key]["Subject"])
         to_line.insert(0, variable_email_dictionary[selected_email_key]["To"])
         cc_line.insert(0, variable_email_dictionary[selected_email_key]["CC"])
@@ -331,6 +334,69 @@ def load_selected_email_entry(selected_email_key):
     
     #Class for popup
     loading_email = choice_window(true_button, false_button, loading_text)
+
+#Method for loading an email template from a file
+def import_email_from_file():
+    
+    def fix_email_string(email_string):
+        split_string = ""
+        finished_string = ""
+
+        if email_string != "None":
+            split_string = email_string.split()
+
+            for i in split_string:
+                if "<" in i or ">" in i:
+                    finished_string += (i + " ")
+                
+                else:
+                    pass
+            
+        else:
+            print("No email address found")
+            pass
+
+        return(finished_string)
+    
+    #Method definition of what buttons will do
+    def true_button():
+        #Deleting entry fields 
+        subject_line.delete(0, "end")
+        to_line.delete(0, "end")
+        cc_line.delete(0, "end")
+        fr_line.delete(0, "end")
+        body_lines.delete("1.0", "end")
+        template_name.delete(0, "end")
+
+        #Loading file for import
+        imported_file_name = os.path.abspath(filedialog.askopenfilename(filetypes = (("Email Files", "*.msg"), ("All Files", "*.*"))))
+        #outlook = win32.dynamic.Dispatch("Outlook.Application") (this was originally going to be used, instead of extract_msg, I don't like the module)
+        print(imported_file_name)
+        #imported_email = win32.OpenSharedItem(imported_file_name) (for some reason this gives an attribute error, I'm keeping this here in case I find a solution)
+        imported_email = ext.Message(imported_file_name)
+        
+        fixed_to = fix_email_string(str(imported_email.to))
+        fixed_cc = fix_email_string(str(imported_email.cc))
+        fixed_fr = fix_email_string(str(imported_email.sender))
+
+        #Setting entry fields as imported email
+        subject_line.insert(0, str(imported_email.subject))
+        to_line.insert(0, fixed_to)
+        cc_line.insert(0, fixed_cc)
+        fr_line.insert(0, fixed_fr)
+        body_lines.insert("1.0", str(imported_email.body))
+        template_name.insert(0, str(imported_email.subject))
+    
+        import_email.destroy()
+
+    def false_button():
+       import_email.destroy()
+
+    #Text for button
+    import_text = "Do you want to load a file?\n(this will delete what is written)"
+    
+    #Class for popup
+    import_email = choice_window(true_button, false_button, import_text)
 
 #Global variables
 json_email_path = "editable_email_dict.json"
@@ -703,6 +769,16 @@ load_email_entry_button = tk.Button(
     command = lambda: load_selected_email_entry(del_entry_var.get())
 )
 load_email_entry_button.grid(row = 10, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+
+#Button for importing email for template
+import_email_button = tk.Button(
+    tab_2,
+    text = "Import Email From File",
+    relief = tk.RAISED,
+    command = lambda: import_email_from_file()
+)
+import_email_button.grid(row = 11, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+import_email_ttp = CreateToolTip(import_email_button, "You must save the template after importing, and should delete the signature from the email if there is one, you can rename the template as desired.")
 
 #For keeping grid in line
 for i in range(0, 1):
