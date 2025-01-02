@@ -195,7 +195,7 @@ def load_dict_json(path):
     with open(path) as readfile:
         initial_import_json = json.load(readfile)
     
-    print(initial_import_json)
+    #print(initial_import_json)
     return initial_import_json
 
 #Send dictionary to json in same directory    
@@ -214,7 +214,7 @@ def delete_entry(dict, del_path, key):
             print("No key found")
 
         #Cleanup files and finalize deletion
-        print(dict)
+        #print(dict)
         send_to_json(del_path, dict)
         deletion_window.destroy()
 
@@ -268,7 +268,7 @@ def add_email_entry(email_template_name, sub, bod, to, cc, frm, email_in_dict):
                             }
     
     variable_email_dictionary = email_in_dict
-    print(variable_email_dictionary)
+    #print(variable_email_dictionary)
     send_to_json(json_email_path, variable_email_dictionary)
     
     #Updating comboboxes
