@@ -235,6 +235,7 @@ def add_email_entry(email_template_name, sub, bod, to, cc, frm, email_in_dict):
     add_cc = ""
     add_frm = ""
 
+    #Fixing multi-line emails and entries without formatting
     if "<" in to or ">" in to:
         add_to = to
 
