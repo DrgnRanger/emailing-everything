@@ -6,6 +6,8 @@ import os
 from os.path import isfile
 import json
 import extract_msg as ext
+import pymupdf as mu
+import re
 
 #Create a choice window that pops up and allows choices on button press
 class choice_window(tk.Toplevel):
@@ -95,6 +97,10 @@ class CreateToolTip(tk.Toplevel):
 def directory_picker_method():
     default_directory.set(filedialog.askdirectory())
 
+#Debug printer for certain tools
+def print_debug():
+    print("Sending emails with input from pdfs: " + str(take_pdf_input.get()))
+
 #Method for updating various comboboxes from dictionaries
 def update_combobox():
     template_type_delete.config(values = list(variable_email_dictionary.keys()))
@@ -107,7 +113,7 @@ def update_combobox():
     send_sig_choice.update()
 
 #Main method for sending emails with attachments
-def send_email(fr, to, template, attachments, sig, manual):
+def send_email(fr, to, template, attachments, sig, manual, pdf_input):
     full_path = attachments.get()
 
     #Open up outlook
@@ -144,7 +150,35 @@ def send_email(fr, to, template, attachments, sig, manual):
             else:    
                 new_mail.Subject = template["Subject"]
 
-            new_mail.Body = template["Body"] + sig
+            #Determining if the body text should take PDF input, and then using the assigned queries
+            find = []
+            document_text = ""
+
+            if take_pdf_input.get():
+                #Opening the pdf
+                document = mu.open(full_path)
+                
+                #Spliting the inputed queries
+                finder_var = template["Queries"].split(",")
+
+                #Getting text from pdf
+                for page in document:
+                    
+                    document_text = page.get_text()
+
+                #Finding specified strings in text from the pdf
+                for query in finder_var:
+
+                    find = re.findall(rf"{query} \d+", document_text)
+
+                if len(find) > 0:
+                    new_mail.Body = template["Body"].format(*find) + sig
+
+                else: 
+                    new_mail.Body = template["Body"] + sig
+            
+            else:
+                new_mail.Body = template["Body"] + sig
 
             #For deciding if the template is to be used or manual input
             if manual == True: 
@@ -229,7 +263,7 @@ def delete_entry(dict, del_path, key):
     deletion_window = choice_window(key_delete, no_delete, deletion_text)
 
 #Add an entry to the email dictionary
-def add_email_entry(email_template_name, sub, bod, to, cc, frm, email_in_dict):
+def add_email_entry(email_template_name, sub, bod, to, cc, frm, email_in_dict, queries):
     #Initialize variables
     add_to = ""
     add_cc = ""
@@ -264,7 +298,8 @@ def add_email_entry(email_template_name, sub, bod, to, cc, frm, email_in_dict):
                             "Body" : bod,
                             "To" : add_to,
                             "CC" : add_cc,
-                            "From" : add_frm
+                            "From" : add_frm,
+                            "Queries" : queries
                             }
     
     variable_email_dictionary = email_in_dict
@@ -305,17 +340,22 @@ def load_selected_sig_entry(selected_sig_key):
     #Class for popup
     loading_signature = choice_window(true_button, false_button, loading_text)
 
+#Delete entry template method
+def delete_template_entries():
+    subject_line.delete(0, "end")
+    to_line.delete(0, "end")
+    cc_line.delete(0, "end")
+    fr_line.delete(0, "end")
+    body_lines.delete("1.0", "end")
+    query_line.delete(0, "end")
+    template_name.delete(0, "end")
+
 #Method for loading email template
 def load_selected_email_entry(selected_email_key):
     #Method definition of what buttons will do
     def true_button():
         #Deleting anything in entry fields
-        subject_line.delete(0, "end")
-        to_line.delete(0, "end")
-        cc_line.delete(0, "end")
-        fr_line.delete(0, "end")
-        body_lines.delete("1.0", "end")
-        template_name.delete(0, "end")
+        delete_template_entries()
 
         #Loading entry fields
         subject_line.insert(0, variable_email_dictionary[selected_email_key]["Subject"])
@@ -323,6 +363,7 @@ def load_selected_email_entry(selected_email_key):
         cc_line.insert(0, variable_email_dictionary[selected_email_key]["CC"])
         fr_line.insert(0, variable_email_dictionary[selected_email_key]["From"])
         body_lines.insert("1.0", variable_email_dictionary[selected_email_key]["Body"])
+        query_line.insert(0, variable_email_dictionary[selected_email_key]["Queries"])
         template_name.insert(0, selected_email_key)
     
         loading_email.destroy()
@@ -362,12 +403,7 @@ def import_email_from_file():
     #Method definition of what buttons will do
     def true_button():
         #Deleting entry fields 
-        subject_line.delete(0, "end")
-        to_line.delete(0, "end")
-        cc_line.delete(0, "end")
-        fr_line.delete(0, "end")
-        body_lines.delete("1.0", "end")
-        template_name.delete(0, "end")
+        delete_template_entries()
 
         #Loading file for import
         imported_file_name = os.path.abspath(filedialog.askopenfilename(filetypes = (("Email Files", "*.msg"), ("All Files", "*.*"))))
@@ -533,11 +569,26 @@ emailer = tk.Button(
         variable_email_dictionary[var_email_choice.get()], 
         default_directory, 
         variable_signature_dictionary[var_signature_choice.get()], 
-        manual_picker.get()
+        manual_picker.get(),
+        take_pdf_input.get()
         )
 )
-emailer.grid(row = 7, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+emailer.grid(row = 7, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 emailer_ttp = CreateToolTip(emailer, "If manual is true, email addresses in template will be overwritten.")
+
+#Checkbutton to take input from PDF 
+take_pdf_input = tk.BooleanVar()
+take_pdf_input.set(False)
+pdf_input_check = ttk.Checkbutton(
+    tab_1,
+    command = print_debug,
+    text = "Use input from PDF",
+    variable = take_pdf_input,
+    onvalue = True,
+    offvalue = False
+)
+pdf_input_check.grid(row = 7, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+pdf_input_ttp = CreateToolTip(pdf_input_check, "If on, this will attempt to take input from a pdf and put it into the template you have provided.")
 
 #Label for signature picking
 pick_signature = tk.Label(
@@ -729,24 +780,40 @@ body_lines = tk.Text(
     width = 40
 )
 body_lines.grid(row = 8, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+body_ttp = CreateToolTip(body_lines, "For adding queries, add each space for a query as {}.")
+
+#Label for queries field, this is for what the program will be searching for in pdfs
+query_label = tk.Label(
+    tab_2,
+    text = "Queries:"
+)
+query_label.grid(row = 9, column = 0,  padx = 5, pady = 5, sticky = (tk.E, tk.W))
+
+#Entry for from section
+query_line = tk.Entry(
+    tab_2,
+    width = 30
+    )
+query_line.grid(row = 9, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+query_ttp = CreateToolTip(query_line, "Input text that the program will query for, it will currently take any number after that text, spaces are important, separate each query by a space.")
 
 #Label for name of email template
 template_label = tk.Label(
     tab_2,
     text = "Name of Template:"
 )
-template_label.grid(row = 9, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+template_label.grid(row = 10, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Text field for adding the body
 template_name = tk.Entry(
     tab_2,
     width = 30
 )
-template_name.grid(row = 9, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+template_name.grid(row = 10, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 temp_name_ttp = CreateToolTip(template_name, "If you use the same name as a new template, or load a template, any changes you have made will overwrite the original.")
 
 #Button for adding to email dictionary
-del_entry_button = tk.Button(
+add_entry_button = tk.Button(
     tab_2,
     text = "Add Email Template Entry",
     relief = tk.RAISED,
@@ -756,11 +823,12 @@ del_entry_button = tk.Button(
         body_lines.get("1.0", "end"), 
         to_line.get(),
         cc_line.get(), 
-        fr_line.get(), 
-        variable_email_dictionary
+        fr_line.get(),
+        variable_email_dictionary,
+        query_line.get()
         )
 )
-del_entry_button.grid(row = 10, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+add_entry_button.grid(row = 11, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button for loading email template from choice
 load_email_entry_button = tk.Button(
@@ -769,7 +837,7 @@ load_email_entry_button = tk.Button(
     relief = tk.RAISED,
     command = lambda: load_selected_email_entry(del_entry_var.get())
 )
-load_email_entry_button.grid(row = 10, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+load_email_entry_button.grid(row = 11, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button for importing email for template
 import_email_button = tk.Button(
@@ -778,7 +846,7 @@ import_email_button = tk.Button(
     relief = tk.RAISED,
     command = lambda: import_email_from_file()
 )
-import_email_button.grid(row = 11, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+import_email_button.grid(row = 12, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 import_email_ttp = CreateToolTip(import_email_button, "You must save the template after importing, and should delete the signature from the email if there is one, you can rename the template as desired.")
 
 #For keeping grid in line
