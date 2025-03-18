@@ -113,7 +113,36 @@ def update_combobox():
     send_sig_choice.update()
 
 #Main method for sending emails with attachments
-def send_email(fr, to, template, attachments, sig, manual, pdf_input):
+def send_email(fr, to, template, attachments, sig, manual):
+    
+    #Function for search pdf text for specific user defined inputs
+    def search_pdf_for(in_query, pdf_text):
+        #User input followed by a number of any length
+        if "##" in in_query:
+            in_query = in_query.replace("##", "")
+            completed_query = re.findall(rf"{in_query}\d+", pdf_text)
+
+        #User input followed by a word of any length
+        elif "ww" in in_query:
+            in_query = in_query.replace("ww", "")
+            completed_query = re.findall(rf"{in_query}\w+", pdf_text)
+
+        #User input followed by a phone number
+        elif "p#" in in_query:
+            in_query = in_query.replace("p#", "")
+            completed_query = re.findall(rf"{in_query}\(\d{3}\).\d{3}.\d{4}|\d{3}.\d{3}.\d{4}", pdf_text)
+
+        #User input followed by a name (technically two capitalized words) in First Last or Last, First
+        elif "nn" in in_query:
+            in_query = in_query.replace("nn", "")
+            completed_query = re.findall(rf"{in_query}([A-Z])\w+ ([A-Z])\w+|{in_query}([A-Z])\w+, ([A-Z])\w+|{in_query}([A-Z])\w+ ([A-Z])\w+", pdf_text)
+
+        else:
+            completed_query = re.findall(query, pdf_text)
+        
+        return completed_query
+
+
     full_path = attachments.get()
 
     #Open up outlook
@@ -159,22 +188,39 @@ def send_email(fr, to, template, attachments, sig, manual, pdf_input):
                 document = mu.open(full_path)
                 
                 #Spliting the inputed queries
-                finder_var = template["Queries"].split(",")
-
+                finder_var = re.split("~", template["Queries"])
+                
                 #Getting text from pdf
                 for page in document:
                     
                     document_text = page.get_text()
 
+                find = []
+                mode = ""
                 #Finding specified strings in text from the pdf
                 for query in finder_var:
+                    
+                    try:
+                        end_query = search_pdf_for(query, document_text)
 
-                    find = re.findall(rf"{query} \d+", document_text)
+                    except:
+                        print("Error: Either queries are invalid due to syntax or template is taking input from PDF when it should not.")
+
+                    #Refining passing queries from templates
+                    if len(end_query) > 1:
+                        print(f"Multitple matches for {query} found, please refine.")
+
+                    elif len(end_query) == 0:
+                        print(f"No matches found for {query}")
+
+                    else: 
+                        find.append(end_query[0])
 
                 if len(find) > 0:
                     new_mail.Body = template["Body"].format(*find) + sig
 
-                else: 
+                else:
+                    print("Could not find matching data from queries.") 
                     new_mail.Body = template["Body"] + sig
             
             else:
@@ -294,7 +340,8 @@ def add_email_entry(email_template_name, sub, bod, to, cc, frm, email_in_dict, q
         email_frm_list = ["<" + i + ">" for i in split_frm]
         add_frm = "; ".join(email_frm_list)
 
-    email_in_dict[email_template_name] = {"Subject" : sub,
+    email_in_dict[email_template_name] = {
+                            "Subject" : sub,
                             "Body" : bod,
                             "To" : add_to,
                             "CC" : add_cc,
@@ -569,8 +616,7 @@ emailer = tk.Button(
         variable_email_dictionary[var_email_choice.get()], 
         default_directory, 
         variable_signature_dictionary[var_signature_choice.get()], 
-        manual_picker.get(),
-        take_pdf_input.get()
+        manual_picker.get()
         )
 )
 emailer.grid(row = 7, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
@@ -780,7 +826,6 @@ body_lines = tk.Text(
     width = 40
 )
 body_lines.grid(row = 8, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
-body_ttp = CreateToolTip(body_lines, "For adding queries, add each space for a query as {}.")
 
 #Label for queries field, this is for what the program will be searching for in pdfs
 query_label = tk.Label(
@@ -795,7 +840,7 @@ query_line = tk.Entry(
     width = 30
     )
 query_line.grid(row = 9, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
-query_ttp = CreateToolTip(query_line, "Input text that the program will query for, it will currently take any number after that text, spaces are important, separate each query by a space.")
+query_ttp = CreateToolTip(query_line, r"Input text that the program will query for, it will currently take any number after that text, spaces are important, separate each query by a tilda (~), add each input in order to body as {}.")
 
 #Label for name of email template
 template_label = tk.Label(
