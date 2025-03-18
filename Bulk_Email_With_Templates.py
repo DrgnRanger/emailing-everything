@@ -97,7 +97,7 @@ class CreateToolTip(tk.Toplevel):
 def directory_picker_method():
     default_directory.set(filedialog.askdirectory())
 
-#Debug printer for certain tools
+#Debug printer for certain tools 
 def print_debug():
     print("Sending emails with input from pdfs: " + str(take_pdf_input.get()))
 
@@ -113,7 +113,7 @@ def update_combobox():
     send_sig_choice.update()
 
 #Main method for sending emails with attachments
-def send_email(fr, to, template, attachments, sig, manual):
+def send_email(fr, to, template, attachments, sig, manual, is_pdf_input):
     
     #Function for search pdf text for specific user defined inputs
     def search_pdf_for(in_query, pdf_text):
@@ -130,16 +130,16 @@ def send_email(fr, to, template, attachments, sig, manual):
         #User input followed by a phone number
         elif "p#" in in_query:
             in_query = in_query.replace("p#", "")
-            completed_query = re.findall(rf"{in_query}\(\d{3}\).\d{3}.\d{4}|\d{3}.\d{3}.\d{4}", pdf_text)
+            completed_query = re.findall(rf"{in_query}\(\d\{{3}}\).\d{{3}}.\d{{4}}|{in_query}\d{{3}}.\d{{3}}.\d{{4}}", pdf_text)
 
         #User input followed by a name (technically two capitalized words) in First Last or Last, First
         elif "nn" in in_query:
             in_query = in_query.replace("nn", "")
-            completed_query = re.findall(rf"{in_query}([A-Z])\w+ ([A-Z])\w+|{in_query}([A-Z])\w+, ([A-Z])\w+|{in_query}([A-Z])\w+ ([A-Z])\w+", pdf_text)
+            completed_query = re.findall(rf"{in_query}[A-Z]\w+ [A-Z]\w+|{in_query}[A-Z]\w+, [A-Z]\w+|{in_query}[A-Z]\w+ [A-Z]\w+", pdf_text)
 
         else:
             completed_query = re.findall(query, pdf_text)
-        
+    
         return completed_query
 
 
@@ -183,7 +183,7 @@ def send_email(fr, to, template, attachments, sig, manual):
             find = []
             document_text = ""
 
-            if take_pdf_input.get():
+            if is_pdf_input:
                 #Opening the pdf
                 document = mu.open(full_path)
                 
@@ -196,7 +196,6 @@ def send_email(fr, to, template, attachments, sig, manual):
                     document_text = page.get_text()
 
                 find = []
-                mode = ""
                 #Finding specified strings in text from the pdf
                 for query in finder_var:
                     
@@ -616,7 +615,8 @@ emailer = tk.Button(
         variable_email_dictionary[var_email_choice.get()], 
         default_directory, 
         variable_signature_dictionary[var_signature_choice.get()], 
-        manual_picker.get()
+        manual_picker.get(),
+        take_pdf_input.get()
         )
 )
 emailer.grid(row = 7, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
