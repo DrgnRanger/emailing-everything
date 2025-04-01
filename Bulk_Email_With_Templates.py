@@ -3,6 +3,7 @@ from datetime import datetime
 from tkinter import ttk, filedialog
 import tkinter as tk
 import os
+import csv
 from os.path import isfile
 import json
 import extract_msg as ext
@@ -97,6 +98,54 @@ class CreateToolTip(tk.Toplevel):
 def directory_picker_method():
     default_directory.set(filedialog.askdirectory())
 
+#Handles events when window is closed
+def on_closing(event):
+    if event.widget != main_window:
+        return
+
+    if not count_exported:
+        export_count(variable_count_dictionary)
+
+#Handles when specific count is selected in specific combobox
+def update_count(event):
+    number_of_type.set(variable_count_dictionary[var_count_choice.get()]["Count"])
+
+#Handles when user wants to set count of emails sent manually
+def change_count(number):
+    
+    #Functions for buttons in count change box
+    def true_button():
+        #Changes the count of selected type in combobox
+        variable_count_dictionary[var_count_choice.get()]["Count"] = number
+        print("Count changed for " + var_count_choice.get())
+        count_change_w.destroy()
+
+    def false_button():
+        count_change_w.destroy()
+    
+    #Text for count change window
+    count_change_text = "Are you sure you want \nto change this count?"
+
+    #Double check if user wishes to change the count or not
+    count_change_w = choice_window(true_button, false_button, count_change_text)
+
+#Exports count data to csv file
+def export_count(in_count):
+    global count_exported
+    
+    #Opens csv and writes data to it
+    with open(fname, "a", newline = '') as f:
+        writer = csv.writer(f, delimiter = ",")
+        for x in list(in_count):
+            writer.writerows([[x, in_count[x]["Count"]]])
+            #variable_count_dictionary[x]["Count"] = 0
+    
+    count_exported = True
+    
+    f.close()
+    print("Count Exported")
+    
+
 #Debug printer for certain tools 
 def print_debug():
     print("Sending emails with input from pdfs: " + str(take_pdf_input.get()))
@@ -112,9 +161,11 @@ def update_combobox():
     send_sig_choice.config(values = list(variable_signature_dictionary.keys()))
     send_sig_choice.update()
 
+    count_choice.config(values = list(variable_count_dictionary.keys()))
+    count_choice.update()
+
 #Main method for sending emails with attachments
 def send_email(fr, to, template, attachments, sig, manual, is_pdf_input):
-    
     #Function for search pdf text for specific user defined inputs
     def search_pdf_for(in_query, pdf_text):
         #User input followed by a number of any length
@@ -163,10 +214,16 @@ def send_email(fr, to, template, attachments, sig, manual, is_pdf_input):
     progress_window.grid_columnconfigure(0, weight = 1)
     progress_window.grid_rowconfigure(0, weight = 1)
 
+    count_progress = 0
+    no_sending_error = True
+    error_count = 0
+
     #This is for sending emails with attachments in a folder, as long as they are pdfs
     for filename in os.listdir(attachments.get()):
         full_path = attachments.get() + "/" + filename
         progress_window.update()
+
+        error = ""
 
         #For deciding if a file is a pdf
         if full_path.endswith(".pdf"):
@@ -189,7 +246,7 @@ def send_email(fr, to, template, attachments, sig, manual, is_pdf_input):
                 
                 #Spliting the inputed queries
                 finder_var = re.split("~", template["Queries"])
-                
+
                 #Getting text from pdf
                 for page in document:
                     
@@ -200,27 +257,43 @@ def send_email(fr, to, template, attachments, sig, manual, is_pdf_input):
                 for query in finder_var:
                     
                     try:
+                        #Searches PDF for specified queries
                         end_query = search_pdf_for(query, document_text)
 
                     except:
-                        print("Error: Either queries are invalid due to syntax or template is taking input from PDF when it should not.")
+                        #If search fails for any reason, ensures email is not sent for redunancy
+                        no_sending_error = False
+                        error = "Either queries are invalid due to syntax or template is taking input from PDF when it should not."
 
                     #Refining passing queries from templates
                     if len(end_query) > 1:
-                        print(f"Multitple matches for {query} found, please refine.")
+                        #If there are too many matches, ensures email is not sent for redunancy
+                        no_sending_error = False
+                        error += f" Multitple matches for {query} found, please refine.\n"
 
                     elif len(end_query) == 0:
-                        print(f"No matches found for {query}")
+                        #If there are no matches, ensures email is not sent for redundancy
+                        no_sending_error = False
+                        error += f" No matches found for {query}\n"  
 
                     else: 
                         find.append(end_query[0])
 
                 if len(find) > 0:
-                    new_mail.Body = template["Body"].format(*find) + sig
+                    try:
+                        #Sets designated spots as places to send information in body of email
+                        new_mail.Body = template["Body"].format(*find) + sig
+
+                    except:
+                        #Catches several errors of  trying to put queries into body
+                        no_sending_error = False
+                        error += f"Queries and template do not match, or there is an issue with the template."
 
                 else:
-                    print("Could not find matching data from queries.") 
+                    #Sets body as empty template with queries but ensures email will not be sent
                     new_mail.Body = template["Body"] + sig
+                    no_sending_error = False
+                    error = "Could not find matching data from queries."
             
             else:
                 new_mail.Body = template["Body"] + sig
@@ -248,25 +321,53 @@ def send_email(fr, to, template, attachments, sig, manual, is_pdf_input):
                 new_mail.SentOnBehalfOfName = combine_fr
             
             else:
+                #Sets CC line if it is not empty or None
                 if template["CC"] != "" or template["CC"] != "None":
                     new_mail.CC = template["CC"]
                 
                 else:
                     pass
-
+                
+                #Sets to and from in email
                 new_mail.To = template["To"]
                 new_mail.SentOnBehalfOfName = template["From"]
 
+            #Adds pdf atachment in folder
             new_mail.Attachments.Add(Source = full_path)
 
-            new_mail.Send()
+            try:
+                #Attempts to send the email and update count
+                if no_sending_error:
+                    new_mail.Send()
+
+                    count_progress += 1
+                
+                elif not no_sending_error:
+                    #If an interim step fails, message will not be sent and error will be printed
+                    error_count += 1
+                    print(f"Email could not be sent. Error: {error}")
+                
+                else:
+                    pass
+
+            except:
+                #Exception if above block fails
+                print("Email could not be sent, check templates/folder/files.")
+                error_count += 1
 
         elif isfile(full_path) and full_path.endswith(".pdf") == False:
             print("File is not pdf")
         
         else:
-             print("No file found")
-  
+            print("No file found")
+    
+    #Cleanup for counting errors and updating the number of emails sent
+    variable_count_dictionary[template["Type"] + ct_date]["Count"] += count_progress
+    print(f"{count_progress} emails processed this batch. {error_count} errors.")
+
+    e_in_batch.set(str(error_count))
+    
+    #Removes loading window
     progress_window.destroy()
 
 #Load dictionary in json from path
@@ -308,7 +409,7 @@ def delete_entry(dict, del_path, key):
     deletion_window = choice_window(key_delete, no_delete, deletion_text)
 
 #Add an entry to the email dictionary
-def add_email_entry(email_template_name, sub, bod, to, cc, frm, email_in_dict, queries):
+def add_email_entry(email_template_name, sub, bod, to, cc, frm, email_in_dict, queries, count_type):
     #Initialize variables
     add_to = ""
     add_cc = ""
@@ -345,12 +446,23 @@ def add_email_entry(email_template_name, sub, bod, to, cc, frm, email_in_dict, q
                             "To" : add_to,
                             "CC" : add_cc,
                             "From" : add_frm,
-                            "Queries" : queries
+                            "Queries" : queries,
+                            "Type" : count_type
                             }
     
+    for item in list(variable_count_dictionary):
+        if item.split(' - ')[0] is not count_type.split():
+            variable_count_dictionary[count_type + ct_date] = {
+                "Count": 0
+            }
+        
+        else:
+            pass
+
     variable_email_dictionary = email_in_dict
     #print(variable_email_dictionary)
-    send_to_json(json_email_path, variable_email_dictionary)
+    send_to_json(json_file_names[0], variable_email_dictionary)
+    print(f"Template {email_template_name} added.")
     
     #Updating comboboxes
     update_combobox()
@@ -360,7 +472,7 @@ def add_signature_entry(sig_template_name, sig, sig_in_dict):
     sig_in_dict[sig_template_name] = sig
                             
     variable_signature_dictionary = sig_in_dict
-    send_to_json(json_signature_path, variable_signature_dictionary)
+    send_to_json(json_file_names[1], variable_signature_dictionary)
 
     #Updating comboboxes
     update_combobox()
@@ -394,6 +506,7 @@ def delete_template_entries():
     fr_line.delete(0, "end")
     body_lines.delete("1.0", "end")
     query_line.delete(0, "end")
+    count_type_line.delete(0, "end")
     template_name.delete(0, "end")
 
 #Method for loading email template
@@ -410,6 +523,7 @@ def load_selected_email_entry(selected_email_key):
         fr_line.insert(0, variable_email_dictionary[selected_email_key]["From"])
         body_lines.insert("1.0", variable_email_dictionary[selected_email_key]["Body"])
         query_line.insert(0, variable_email_dictionary[selected_email_key]["Queries"])
+        count_type_line.insert(0, variable_email_dictionary[selected_email_key]["Type"])
         template_name.insert(0, selected_email_key)
     
         loading_email.destroy()
@@ -482,10 +596,29 @@ def import_email_from_file():
     import_email = choice_window(true_button, false_button, import_text)
 
 #Global variables, this does assume that both json files are in the same directory as this program
-json_email_path = "editable_email_dict.json"
-json_signature_path = "editable_signature.json"
+json_file_names = ["editable_email_dict.json", "editable_signature.json", "email_count_dictionary.csv"]
 variable_email_dictionary = {}
 variable_signature_dictionary = {}
+variable_count_dictionary = {}
+empty_data = {}
+ct_date = ' - ' + datetime.today().strftime("%m/%d/%y")
+count_exported = False
+error_count = 0
+
+#Checking if json files exist in directory where program is
+for fname in json_file_names:
+    if os.path.exists(fname):
+        print(fname + " exists")
+    
+    elif fname.endswith(".json"):
+        with open(fname, "w") as f:
+            json.dump(empty_data, f)
+    
+    elif fname.endswith(".csv"):
+        with open(fname, "w", newline = '') as f:
+            writer = csv.writer(f, delimiter = ",")
+            writer.writerows([["Type", "Count\n"]])
+            f.close()
 
 #Initialize main window, this could be done in a class for a more robust approach, but that will take a large rewrite and isn't entirely necessary
 main_window = tk.Tk()
@@ -494,8 +627,18 @@ main_window.title("Mail Sending")
 tab_control = ttk.Notebook(main_window)
 
 #Loading the various dictionaries from jsons
-variable_email_dictionary = load_dict_json(json_email_path)
-variable_signature_dictionary = load_dict_json(json_signature_path)
+variable_email_dictionary = load_dict_json(json_file_names[0])
+variable_signature_dictionary = load_dict_json(json_file_names[1])
+
+#Creating dictionary for count values
+try:
+    for loaded_template in variable_email_dictionary:
+        variable_count_dictionary[variable_email_dictionary[loaded_template]["Type"] + ct_date] = {
+            "Count": 0
+        }
+
+except:
+    print("No templates found for count.")
 
 #Setting default directory variable for changing later
 default_directory = tk.StringVar()
@@ -504,9 +647,11 @@ default_directory.set("C:/")
 #Settiing up tabs for the window
 tab_1 = ttk.Frame(tab_control)
 tab_2 = ttk.Frame(tab_control)
+tab_3 = ttk.Frame(tab_control)
 
 tab_control.add(tab_1, text = "Send Emails")
 tab_control.add(tab_2, text = "Edit Templates")
+tab_control.add(tab_3, text = "Count")
 tab_control.pack(expand = 1, fill = "both")
 
 #TAB 1
@@ -661,7 +806,7 @@ del_signature_entry_button = tk.Button(
     relief = tk.RAISED,
     command = lambda: delete_entry(
         variable_signature_dictionary, 
-        json_signature_path, 
+        json_file_names[1], 
         var_signature_choice.get()
         )
 )
@@ -696,7 +841,7 @@ add_signature_entry_button = tk.Button(
     relief = tk.RAISED,
     command = lambda: add_signature_entry(
         sig_entry_name_in.get(), 
-        sig_full.get("1.0", "end"), 
+        sig_full.get("1.0", "end-1c"), 
         variable_signature_dictionary
         )
 )
@@ -738,7 +883,7 @@ del_entry_button = tk.Button(
     relief = tk.RAISED,
     command = lambda: delete_entry(
         variable_email_dictionary, 
-        json_email_path, 
+        json_file_names[0], 
         del_entry_var.get()
         )
 )
@@ -842,19 +987,34 @@ query_line = tk.Entry(
 query_line.grid(row = 9, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 query_ttp = CreateToolTip(query_line, r"Input text that the program will query for, it will currently take any number after that text, spaces are important, separate each query by a tilda (~), add each input in order to body as {}.")
 
-#Label for name of email template
+#Label for queries field, this is for what the program will be searching for in pdfs
+count_type_label = tk.Label(
+    tab_2,
+    text = "Email Type (for count):"
+)
+count_type_label.grid(row = 10, column = 0,  padx = 5, pady = 5, sticky = (tk.E, tk.W))
+
+#Entry for from section
+count_type_line = tk.Entry(
+    tab_2,
+    width = 30
+    )
+count_type_line.grid(row = 10, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+count_type_ttp = CreateToolTip(count_type_line, "Specify the type of workflow this template pertains to, all templates of the same type will be added to a total count.")
+
+#Label for entry field of name of template
 template_label = tk.Label(
     tab_2,
     text = "Name of Template:"
 )
-template_label.grid(row = 10, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+template_label.grid(row = 11, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
-#Text field for adding the body
+#Entry field for naming template
 template_name = tk.Entry(
     tab_2,
     width = 30
 )
-template_name.grid(row = 10, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+template_name.grid(row = 11, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 temp_name_ttp = CreateToolTip(template_name, "If you use the same name as a new template, or load a template, any changes you have made will overwrite the original.")
 
 #Button for adding to email dictionary
@@ -865,15 +1025,16 @@ add_entry_button = tk.Button(
     command = lambda: add_email_entry(
         template_name.get(), 
         subject_line.get(), 
-        body_lines.get("1.0", "end"), 
+        body_lines.get("1.0", "end-1c"), 
         to_line.get(),
         cc_line.get(), 
         fr_line.get(),
         variable_email_dictionary,
-        query_line.get()
+        query_line.get(),
+        count_type_line.get()
         )
 )
-add_entry_button.grid(row = 11, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+add_entry_button.grid(row = 12, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button for loading email template from choice
 load_email_entry_button = tk.Button(
@@ -882,7 +1043,7 @@ load_email_entry_button = tk.Button(
     relief = tk.RAISED,
     command = lambda: load_selected_email_entry(del_entry_var.get())
 )
-load_email_entry_button.grid(row = 11, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+load_email_entry_button.grid(row = 12, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button for importing email for template
 import_email_button = tk.Button(
@@ -891,23 +1052,81 @@ import_email_button = tk.Button(
     relief = tk.RAISED,
     command = lambda: import_email_from_file()
 )
-import_email_button.grid(row = 12, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
+import_email_button.grid(row = 13, column = 0, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 import_email_ttp = CreateToolTip(import_email_button, "You must save the template after importing, and should delete the signature from the email if there is one, you can rename the template as desired.")
+
+#TAB 3
+
+#Combobox for the type of email being sent relating to how many emails have been sent
+var_count_choice = tk.StringVar()
+count_choice = ttk.Combobox(
+    tab_3,
+    values = list(variable_count_dictionary.keys()),
+    textvariable = var_count_choice,
+    state = "readonly"
+    )
+count_choice.grid(row = 0, column = 0, padx = 5, pady = 5, sticky = (tk.E, tk.W, tk.N))
+
+#Shows how many emails of a specific type have been sent, can be edited
+number_of_type = tk.StringVar()
+counted_type = tk.Entry(
+    tab_3,
+    width = 30,
+    textvariable = number_of_type
+    )
+counted_type.grid(row = 0, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W, tk.N))
+
+#Button for editing count of selected type
+change_count_button = tk.Button(
+    tab_3,
+    text = "Change Selected Count",
+    relief = tk.RAISED,
+    command = lambda: change_count(counted_type.get())
+)
+change_count_button.grid(row = 1, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W, tk.N))
+
+#Button for exporting the count of all emails to the csv file 
+export_count_button = tk.Button(
+    tab_3,
+    text = "Export All Counts",
+    relief = tk.RAISED,
+    command = lambda: export_count(variable_count_dictionary)
+)
+export_count_button.grid(row = 2, columnspan = 2, padx = 5, pady = 5, sticky = (tk.E, tk.W, tk.N))
+
+#Label for queries field, this is for what the program will be searching for in pdfs
+error_amount_label = tk.Label(
+    tab_3,
+    text = "Errors In Last Batch:"
+)
+error_amount_label.grid(row = 3, column = 0,  padx = 5, pady = 5, sticky = (tk.E, tk.W))
+
+#Entry for from section
+e_in_batch = tk.StringVar()
+errors_prev = tk.Entry(
+    tab_3,
+    width = 30,
+    textvariable = e_in_batch, 
+    state = "readonly"
+    )
+errors_prev.grid(row = 3, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #For keeping grid in line
 for i in range(0, 1):
     tab_1.columnconfigure(i, weight = 1)
 
-for i in range(0, 13):  
+for i in range(0, 12):  
     tab_1.rowconfigure(i, weight = 1)
 
 for i in range(0, 1):
     tab_2.columnconfigure(i, weight = 1)
 
-for i in range(0, 10):
+for i in range(0, 13):
     tab_2.rowconfigure(i, weight = 1)
 
 #END TABS
 
 main_window.resizable(0, 0)
+main_window.bind("<Destroy>", on_closing)
+count_choice.bind("<<ComboboxSelected>>", update_count)
 main_window.mainloop()
