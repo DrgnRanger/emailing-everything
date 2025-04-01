@@ -164,35 +164,18 @@ def update_combobox():
     count_choice.config(values = list(variable_count_dictionary.keys()))
     count_choice.update()
 
+
+#Returns a raw string from input
+def to_raw(s):
+    return(rf'{s}')
+    
 #Main method for sending emails with attachments
 def send_email(fr, to, template, attachments, sig, manual, is_pdf_input):
-    #Function for search pdf text for specific user defined inputs
+    #Passes queries using regex
     def search_pdf_for(in_query, pdf_text):
-        #User input followed by a number of any length
-        if "##" in in_query:
-            in_query = in_query.replace("##", "")
-            completed_query = re.findall(rf"{in_query}\d+", pdf_text)
-
-        #User input followed by a word of any length
-        elif "ww" in in_query:
-            in_query = in_query.replace("ww", "")
-            completed_query = re.findall(rf"{in_query}\w+", pdf_text)
-
-        #User input followed by a phone number
-        elif "p#" in in_query:
-            in_query = in_query.replace("p#", "")
-            completed_query = re.findall(rf"{in_query}\(\d\{{3}}\).\d{{3}}.\d{{4}}|{in_query}\d{{3}}.\d{{3}}.\d{{4}}", pdf_text)
-
-        #User input followed by a name (technically two capitalized words) in First Last or Last, First
-        elif "nn" in in_query:
-            in_query = in_query.replace("nn", "")
-            completed_query = re.findall(rf"{in_query}[A-Z]\w+ [A-Z]\w+|{in_query}[A-Z]\w+, [A-Z]\w+|{in_query}[A-Z]\w+ [A-Z]\w+", pdf_text)
-
-        else:
-            completed_query = re.findall(query, pdf_text)
+        completed_query = re.findall(to_raw(in_query), pdf_text)
     
         return completed_query
-
 
     full_path = attachments.get()
 
@@ -249,9 +232,8 @@ def send_email(fr, to, template, attachments, sig, manual, is_pdf_input):
 
                 #Getting text from pdf
                 for page in document:
-                    
                     document_text = page.get_text()
-
+                
                 find = []
                 #Finding specified strings in text from the pdf
                 for query in finder_var:
