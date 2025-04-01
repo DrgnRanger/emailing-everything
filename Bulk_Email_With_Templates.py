@@ -613,11 +613,15 @@ for fname in json_file_names:
     elif fname.endswith(".json"):
         with open(fname, "w") as f:
             json.dump(empty_data, f)
+        
+        print("Templates created.")
     
     elif fname.endswith(".csv"):
         with open(fname, "w", newline = '') as f:
             writer = csv.writer(f, delimiter = ",")
-            writer.writerows([["Type", "Count\n"]])
+            writer.writerows([["Type", "Count"]])
+
+            print("Count document created.")
             f.close()
 
 #Initialize main window, this could be done in a class for a more robust approach, but that will take a large rewrite and isn't entirely necessary
@@ -796,7 +800,10 @@ send_sig_choice = ttk.Combobox(
     textvariable = var_signature_choice,
     state = "readonly"
     )
-send_sig_choice.current(0)
+try:
+    send_sig_choice.current(0)
+except:
+    print("No signatures found.")
 send_sig_choice.grid(row = 8, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button for deleting a dictionary entry
@@ -873,7 +880,10 @@ template_type_delete = ttk.Combobox(
     textvariable = del_entry_var,
     state = "readonly"
     )
-template_type_delete.current(0)
+try:
+    template_type_delete.current(0)
+except:
+    print("No templates found.")
 template_type_delete.grid(row = 0, column = 1, padx = 5, pady = 5, sticky = (tk.E, tk.W))
 
 #Button for deleting a dictionary entry
